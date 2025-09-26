@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+.python-version
+.venv/
+venv/
+env/
+ENV/
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+pnpm-lock.yaml
+
+# Terraform
+.terraform/
+terraform.tfstate
+terraform.tfstate.backup
+.terraform.lock.hcl
+*.tfvars
+
+# Docker
+docker-compose.override.yml
+.docker/
+
+# OS / Editor
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+__MACOSX/
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# Keys, secrets, env
+.env
+.env.*
+*.pem
+*.key
+secrets.json
+
+# Logs
+*.log

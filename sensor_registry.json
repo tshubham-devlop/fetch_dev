@@ -1,0 +1,20 @@
+{
+  "11:2A:00:3B:4D:22": {
+        "loc_id": "LOC004",
+        "name": "NIT, 9, Jalandhar",
+        "latitude": 45.8,
+        "longitude": 56.19,
+        "agent_name": "worker_agent_5",
+        "agent_seed": "gold broken example fruit cliff crazy forum walk obscure glory luxury number",
+        "agent_port": 8014
+    },
+    "00:1A:2B:3C:4D:5E": {
+        "loc_id": "LOC001",
+        "name": "Dwarka , 7, Delhi",
+        "latitude": 28.555594,
+        "longitude": 77.042797,
+        "agent_name": "worker_agent_1",
+        "agent_seed": "hour armed goddess false smoke oak physical clean near place concert will",
+        "agent_port": 8010
+    }
+}
