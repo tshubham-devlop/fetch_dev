@@ -167,11 +167,43 @@ def register_sensor():
         "message": f"Agent '{agent_name}' for device {mac_address} registered and launched successfully."
     })
 
+# @app.route('/registry', methods=['GET'])
+
+# def get_registry():
+#     """Serves the entire sensor registry from the in-memory buffer."""
+#     registry = read_registry()
+#     return jsonify(registry)
+
+def clean_null_values(data):
+    """Recursively removes null/None values from dictionaries and lists."""
+    if isinstance(data, dict):
+        cleaned = {}
+        for key, value in data.items():
+            if value is not None:
+                cleaned_value = clean_null_values(value)
+                if cleaned_value is not None:
+                    cleaned[key] = cleaned_value
+        return cleaned if cleaned else None
+    elif isinstance(data, list):
+        cleaned = [clean_null_values(item) for item in data if item is not None]
+        return [item for item in cleaned if item is not None] if cleaned else None
+    else:
+        return data if data is not None else None
+
 @app.route('/registry', methods=['GET'])
 def get_registry():
     """Serves the entire sensor registry from the in-memory buffer."""
     registry = read_registry()
-    return jsonify(registry)
+    
+    # Clean null values from the registry
+    cleaned_registry = clean_null_values(registry)
+    
+    # Ensure we always return a valid dictionary
+    if cleaned_registry is None:
+        cleaned_registry = {}
+
+    
+    return jsonify(cleaned_registry)
 
 @app.route('/deregister', methods=['POST'])
 def deregister_sensor():
