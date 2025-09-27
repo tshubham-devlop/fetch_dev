@@ -248,36 +248,35 @@ def deregister_sensor():
     """
     Deregisters a sensor by removing it from the buffer and then calling request-slash.
     """
-    try:
-        data = request.json
-        mac_address = data.get('mac_address')
-        
-        if not mac_address:
-            return jsonify({"status": "error", "message": "MAC address is required."}), 400
-        
-        registry = read_registry()
-        
-        # Check if the MAC address exists in the registry
-        if mac_address not in registry:
-            return jsonify({"status": "error", "message": f"Device {mac_address} not found in registry."}), 404
-        
-        # Store the sensor info before removal for logging
-        sensor_info = registry[mac_address]
-        agent_name = sensor_info.get('agent_name', 'unknown')
-        
-        print(f"[API] Deregistering sensor {mac_address} (Agent: {agent_name})")
-        
-        # Remove the sensor from the registry buffer
-        del registry[mac_address]
-        write_registry(registry)
-        
-        print(f"[API] Sensor {mac_address} removed from registry buffer")
-        
-        return jsonify({
-            "status": "success",
-            "message": f"Sensor {mac_address} successfully deregistered.",
-            "agent_name": agent_name
-        })
+    data = request.json
+    mac_address = data.get('mac_address')
+    
+    if not mac_address:
+        return jsonify({"status": "error", "message": "MAC address is required."}), 400
+    
+    registry = read_registry()
+    
+    # Check if the MAC address exists in the registry
+    if mac_address not in registry:
+        return jsonify({"status": "error", "message": f"Device {mac_address} not found in registry."}), 404
+    
+    # Store the sensor info before removal for logging
+    sensor_info = registry[mac_address]
+    agent_name = sensor_info.get('agent_name', 'unknown')
+    
+    print(f"[API] Deregistering sensor {mac_address} (Agent: {agent_name})")
+    
+    # Remove the sensor from the registry buffer
+    del registry[mac_address]
+    write_registry(registry)
+    
+    print(f"[API] Sensor {mac_address} removed from registry buffer")
+    
+    return jsonify({
+        "status": "success",
+        "message": f"Sensor {mac_address} successfully deregistered.",
+        "agent_name": agent_name
+    })
             
    
 @app.route('/request-slash', methods=['POST'])
