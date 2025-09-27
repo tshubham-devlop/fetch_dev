@@ -11,7 +11,7 @@ import requests
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(PROJECT_ROOT)
 # API endpoint to fetch sensor registry data from Flask app
-API_BASE_URL = "http://127.0.0.1:5000"
+API_BASE_URL = "https://fetch-dev.onrender.com"
 
 # This absolute import will now work correctly with the updated schema
 from fetch_services.agents.schemas import SensorData

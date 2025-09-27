@@ -28,8 +28,8 @@ sensor_registry_buffer = {
     "00:1A:2B:3C:4D:5E": {
         "loc_id": "LOC001",
         "name": "Dwarka , 7, Delhi",
-        "latitude": 38.555594,
-        "longitude": 17.042797,
+        "latitude": 28.51103,
+        "longitude": 77.012798,
         "agent_name": "worker_agent_1",
         "agent_seed": "hour armed goddess false smoke oak physical clean near place concert will",
         "agent_port": 8010

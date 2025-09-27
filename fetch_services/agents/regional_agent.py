@@ -30,12 +30,13 @@ from config.settings import AGENTVERSE_API_KEY
 # The Notary Agent's address will be loaded dynamically from the registry
 NOTARY_AGENT_ADDRESS = None
 # The base URL for the central Flask server
-API_BASE_URL = "http://127.0.0.1:5000"
+API_BASE_URL = "https://fetch-dev.onrender.com"
 
 def read_registry():
     """Fetches the sensor registry from the central API server."""
     try:
         response = requests.get(f"{API_BASE_URL}/registry", timeout=10)
+        print(response)
         response.raise_for_status()  # Raise an exception for bad status codes
         print("Successfully fetched registry from API.")
         return response.json()
@@ -111,7 +112,7 @@ def cleanup_sensor_and_agent(mac_address: str):
     try:
         # NOTE: This is a synchronous call for simplicity in this function.
         response = requests.post(
-            "http://127.0.0.1:5000/request-slash",
+            "https://fetch-dev.onrender.com/request-slash",
             json={"mac_address": mac_address},
             timeout=20
         )
