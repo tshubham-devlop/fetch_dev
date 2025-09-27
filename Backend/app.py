@@ -233,6 +233,12 @@ def deregister_sensor():
     write_registry(registry)
     
     print(f"[API] Sensor {mac_address} removed from registry buffer")
+
+    return jsonify({
+        "status": "success",
+        "message": f"Sensor {mac_address} successfully deregistered .",
+    })
+
     
 
 @app.route('/request-slash', methods=['POST'])
