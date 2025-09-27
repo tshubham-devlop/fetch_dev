@@ -273,55 +273,13 @@ def deregister_sensor():
         
         print(f"[API] Sensor {mac_address} removed from registry buffer")
         
-        # Now call the request-slash endpoint internally if blockchain is available
-        if BLOCKCHAIN_AVAILABLE:
-            try:
-                slash_response = requests.post(
-                    'http://127.0.0.1:5000/request-slash',
-                    json={'mac_address': mac_address},
-                    timeout=30
-                )
-                
-                if slash_response.status_code == 200:
-                    slash_data = slash_response.json()
-                    return jsonify({
-                        "status": "success",
-                        "message": f"Sensor {mac_address} successfully deregistered and stake slashed.",
-                        "agent_name": agent_name,
-                        "slash_tx_hash": slash_data.get("tx_hash"),
-                        "slash_response": slash_data
-                    })
-                else:
-                    # Partial success - sensor removed but slashing failed
-                    slash_error = slash_response.text
-                    return jsonify({
-                        "status": "partial_success",
-                        "message": f"Sensor {mac_address} removed from registry but slashing failed.",
-                        "agent_name": agent_name,
-                        "slash_error": slash_error,
-                        "slash_status_code": slash_response.status_code
-                    }), 207
-                    
-            except requests.exceptions.RequestException as e:
-                # Partial success - sensor removed but couldn't call slash endpoint
-                return jsonify({
-                    "status": "partial_success", 
-                    "message": f"Sensor {mac_address} removed from registry but slashing request failed.",
-                    "agent_name": agent_name,
-                    "slash_error": str(e)
-                }), 207
-        else:
-            # No blockchain connection - just return success for registry removal
-            return jsonify({
-                "status": "success",
-                "message": f"Sensor {mac_address} successfully deregistered (blockchain not available).",
-                "agent_name": agent_name
-            })
+        return jsonify({
+            "status": "success",
+            "message": f"Sensor {mac_address} successfully deregistered.",
+            "agent_name": agent_name
+        })
             
-    except Exception as e:
-        print(f"[API] Deregistration error: {e}")
-        return jsonify({"status": "error", "message": f"Deregistration failed: {str(e)}"}), 500
-
+   
 @app.route('/request-slash', methods=['POST'])
 def request_slash():
     if not BLOCKCHAIN_AVAILABLE:
