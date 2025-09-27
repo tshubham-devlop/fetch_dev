@@ -277,7 +277,7 @@ async def handle_sensor_data(ctx: Context, sender: str, msg: SensorData):
     validation_request = ValidationRequest(**request_data, public_key=export_public_key_hex(public_key), signature=private_key.sign(get_digest(request_data)).hex())
 
     for peer_address in event_local_group:
-        if peer_address != str(ctx.address):
+        if peer_address != str(agent.address):
             await ctx.send(peer_address, validation_request)
 
 @validation_protocol.on_message(model=ValidationRequest, replies=set())
@@ -339,7 +339,7 @@ async def process_mqtt_queue(ctx: Context):
         try:
             sensor_data = message_queue.get_nowait()
             ctx.logger.info(f"Pulled sensor data from MQTT queue for device: {sensor_data.device_id}")
-            await handle_sensor_data(ctx, agent.address, sensor_data)
+            await handle_sensor_data(ctx, str(agent.address), sensor_data)
         except queue.Empty: pass
         except Exception as e: ctx.logger.error(f"Error processing item from queue: {e}")
 
