@@ -3,7 +3,6 @@ import os
 # --- Path Configuration ---
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(PROJECT_ROOT)
-SENSOR_REGISTRY_FILE = os.path.join(PROJECT_ROOT, "sensor_registry.json")
 
 import asyncio
 import hashlib
@@ -21,7 +20,7 @@ from uagents.crypto import Identity
 from cosmpy.crypto.keypairs import PublicKey, PrivateKey
 from mnemonic import Mnemonic
 
-from fetch_services.agents.schemas import SensorData, ValidationRequest, ValidationResponse, FactCandidate, ValidatedSensorData
+from fetch_services.agents.schemas import SensorData, ValidationRequest, ValidationResponse, FactCandidate, ValidatedSensorData , EnrichedData
 from fetch_services.agents.ml_model import run_inference
 from fetch_services.ipfs_service import IPFSService
 from fetch_services.consensus.consensus_logic import SmartConsensus
@@ -30,12 +29,19 @@ from config.settings import AGENTVERSE_API_KEY
 
 # The Notary Agent's address will be loaded dynamically from the registry
 NOTARY_AGENT_ADDRESS = None
+# The base URL for the central Flask server
+API_BASE_URL = "http://127.0.0.1:5000"
 
 def read_registry():
-    """Safely reads the shared sensor registry file."""
-    time.sleep(0.2)
-    with open(SENSOR_REGISTRY_FILE, 'r') as f:
-        return json.load(f)
+    """Fetches the sensor registry from the central API server."""
+    try:
+        response = requests.get(f"{API_BASE_URL}/registry", timeout=10)
+        response.raise_for_status()  # Raise an exception for bad status codes
+        print("Successfully fetched registry from API.")
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"CRITICAL: Could not fetch registry from API: {e}. Returning empty registry.")
+        return {}
 
 # --- Agent & Peer Configuration ---
 if len(sys.argv) < 2:
@@ -79,7 +85,7 @@ FAILURE_THRESHOLD = 5
 PENDING_LOCK = asyncio.Lock()
 pending_events = {}
 VALIDATION_TIMEOUT = timedelta(seconds=15)
-GRID_SIZE = 0.0000009
+GRID_SIZE = 0.1
 ipfs_service = IPFSService()
 smart_consensus = SmartConsensus()
 QUORUM_RATIO = 0.45 
@@ -105,7 +111,7 @@ def cleanup_sensor_and_agent(mac_address: str):
     try:
         # NOTE: This is a synchronous call for simplicity in this function.
         response = requests.post(
-            "http://127.0.0.1:5002/request-slash",
+            "http://127.0.0.1:5000/request-slash",
             json={"mac_address": mac_address},
             timeout=20
         )
@@ -113,20 +119,10 @@ def cleanup_sensor_and_agent(mac_address: str):
         api_ack = response.json()
         print(f"--> API Acknowledged Slash Request: {api_ack.get('message')} (Tx: {api_ack.get('tx_hash')})")
 
-        # 2. Only after successful slash, remove sensor from registry
-        try:
-            with open(SENSOR_REGISTRY_FILE, "r") as f:
-                registry = json.load(f)
-
-            if mac_address in registry:
-                del registry[mac_address]
-                with open(SENSOR_REGISTRY_FILE, "w") as f:
-                    json.dump(registry, f, indent=2)
-                print(f"--> Sensor {mac_address} removed from registry after successful slash.")
-            else:
-                print(f"--> Sensor {mac_address} not found in registry, nothing to delete.")
-        except Exception as e:
-            print(f"--> WARNING: Could not update sensor registry: {e}")
+        # 2. After the slash, the agent should notify the server to remove the sensor.
+        # This part is simplified as the agent doesn't directly modify the registry anymore.
+        # A dedicated API endpoint on the server would be needed to handle removal securely.
+        print(f"--> Sensor {mac_address} should be removed from the registry by an administrator or via a secure API call.")
 
     except requests.exceptions.RequestException as e:
         print(f"--> CRITICAL: Failed to send slash request to API: {e}")
@@ -158,12 +154,37 @@ async def final_actions_after_consensus(ctx: Context, event_info: dict, location
     raw_data = event_info["raw_data"]
     print(raw_data)
 
+    # # 1. Send the original raw data to a locally running API instead of IPFS
+    # ipfs_link = " "
+    # local_api_url = "http://82.177.167.151:3001/api/sensor"  # <-- replace with your actual local API endpoint
+    # try:
+    #     async with aiohttp.ClientSession() as session:
+    #         async with session.post(local_api_url, json=raw_data, timeout=10) as resp:
+    #             try:
+    #                 resp_json = await resp.json()
+    #             except Exception:
+    #                 resp_text = await resp.text()
+    #                 resp_json = {"status_text": resp_text}
+    #             ipfs_link = resp_json.get("ipfs_link", "")
+    #             ctx.logger.info(f"Consensus reached. Raw data sent to local API: {resp_json}")
+    # except asyncio.CancelledError:
+    #     raise
+    # except Exception as e:
+    #     ctx.logger.error(f"Failed to send raw data to local API at {local_api_url}: {e}")
     # 1. Send the original raw data to a locally running API instead of IPFS
     ipfs_link = " "
-    local_api_url = "http://localhost:3001/api/sensor"  # <-- replace with your actual local API endpoint
+    local_api_url = "http://82.177.167.151:3001/api/sensor"  # <-- replace with your actual local API endpoint
+    
+    # Transform raw_data to use deviceId instead of device_id
+    transformed_data = {
+        "deviceId": raw_data['device_id'],  # Change device_id to deviceId
+        "timestamp": raw_data['timestamp'],
+        "decibel": raw_data['decibel']
+    }
+    
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.post(local_api_url, json=raw_data, timeout=10) as resp:
+            async with session.post(local_api_url, json=transformed_data, timeout=10) as resp:
                 try:
                     resp_json = await resp.json()
                 except Exception:
@@ -208,26 +229,28 @@ async def final_actions_after_consensus(ctx: Context, event_info: dict, location
         ctx.logger.error("Could not find Notary Agent address in registry.")
 
     # 3. Forward Enriched Packet to External API (async version, using EnrichedData schema)
+   # 3. Forward Enriched Packet to External API (async version, using EnrichedData schema)
     validator_pub_keys = [res.public_key for res in event_info["responses"] if res.validated]
 
-    enriched_payload = EnrichedData(
-        device_id=raw_data['device_id'],
-        event=event_info["predicted_class"],
-        decibel=raw_data['decibel'],
-        timestamp=raw_data['timestamp'],   # ISO string, matches schema
-        location=location,                 # keep as {"latitude": ..., "longitude": ...}
-        confidence=event_info["confidence"],
-        validated=True,
-        orchestrator_address=str(agent.address),
-        validator_addresses=validator_pub_keys,
-        raw_data_ipfs_link=ipfs_link
-    )
+        # Remap to external API schema
+    payload = {
+        "mac_address": raw_data['device_id'],
+        "latitude": location.get("latitude"),
+        "longitude": location.get("longitude"),
+        "decibel_level": raw_data['decibel'],
+        "event_type": event_info["predicted_class"],
+        "metadata": {
+            "source": "sensor_network",       # static for now
+            "location_name": "Unknown"        # ⚠ can add reverse geocoding later
+        }
+    }
 
-    url = "http://localhost:5001/ingest"  # <-- update if needed
+
+    url = "http://82.177.167.151:5001/ingest"  # <-- update if needed
     ctx.logger.info("🚀 SENDING ENRICHED PACKET TO EXTERNAL API 🚀")
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=enriched_payload.dict(), timeout=10) as resp:
+            async with session.post(url, json=payload, timeout=10) as resp:
                 try:
                     resp_json = await resp.json()
                 except Exception:
@@ -238,8 +261,6 @@ async def final_actions_after_consensus(ctx: Context, event_info: dict, location
         raise
     except Exception as e:
         ctx.logger.error(f"Failed to send enriched packet to {url}: {e}")
-
-
 
 # --- Protocols & Message Handlers ---
 validation_protocol = Protocol("WorkerAgentValidation")
@@ -254,6 +275,8 @@ async def handle_sensor_data(ctx: Context, sender: str, msg: SensorData):
     
     sensor_mac = msg.device_id
     all_configs = read_registry()
+    print(all_configs)
+    print(sensor_mac)
     if sensor_mac not in all_configs:
         return
         
@@ -267,6 +290,8 @@ async def handle_sensor_data(ctx: Context, sender: str, msg: SensorData):
     
     event_id = hashlib.sha256(f"{msg.device_id}-{msg.timestamp}".encode()).hexdigest()
     event_local_group = get_local_peer_group(registered_location)
+
+    print(event_local_group)
 
     async with PENDING_LOCK:
         pending_events[event_id] = {
@@ -292,14 +317,18 @@ async def handle_sensor_data(ctx: Context, sender: str, msg: SensorData):
         "sound_class": predicted_class,
         "decibel": msg.decibel
     }
+
+    print("Request Data :" ,request_data)
     digest = get_digest(request_data)
     signature_bytes = private_key.sign(digest)
+    print("Digest: ",digest)
+    print("signature : ",signature_bytes)
     validation_request = ValidationRequest(
         **request_data,
         public_key=export_public_key_hex(public_key),
         signature=signature_bytes.hex(),
     )
-
+    print(validation_protocol)
     # Send ValidationRequest to all peers
     for peer_address in event_local_group:
         if peer_address != str(agent.address):
