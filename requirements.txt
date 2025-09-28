@@ -11,4 +11,4 @@ rapidfuzz
 aiohttp
 web3
 python-dotenv
-
+pymongo
